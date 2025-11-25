@@ -1,11 +1,16 @@
+import time
+import numpy
 import torchvision
-from matplotlib import pyplot
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 import torch
 from gradMatrix import gradMatrix as GM
 import grad
 import random
 from enum import Enum
 import math
+import multiprocessing
+import threading
 
 
 class actFunc(Enum):
@@ -122,7 +127,81 @@ def computeAcc(aNN,testDS,extractNum=100):
     return sum*1.0/extractNum
 
 
-def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum):
+def showTrainProcess(size,queue,modelName=""):
+
+    x=range(size)
+    y=[0]*size
+    pos=[0]
+
+    drawLineThread=threading.Thread(target=drawLine,name='drawLineThread',kwargs={'x':x,'y':y,'pos':pos,'modelName':modelName},daemon=True)
+    drawLineThread.start()
+
+    while True:
+        try:
+            y[pos[0]]=queue.get_nowait()
+            if y[pos[0]]<0:
+                break
+            pos[0]=(pos[0]+1)%size
+        except:
+            time.sleep(1)
+
+    drawLineThread.terminate()
+    
+
+def drawLine(x,y,pos=[],modelName=""):
+
+    plt.rcParams['font.sans-serif'] = ['SimHei']  
+    plt.rcParams['axes.unicode_minus'] = False    
+
+    fig,ax=plt.subplots(figsize=(10,6))
+    ax.set_xlim(0,len(x))  
+    ax.set_ylim(0,1.1)
+    ax.set_yticks(numpy.arange(0,1.1,0.01))
+    yLabel=[""]*110
+    for i in range(10,110,10):
+        yLabel[i]=str(i)+"%"
+    ax.set_yticklabels(yLabel)
+    ax.set_xlabel('time')
+    ax.set_ylabel('acc:')
+    ax.set_title(modelName+' acc_record')
+    ax.grid(True) 
+
+    line,=ax.plot([],[],'g-',linewidth=2)
+    pointRecord,=ax.plot(0,0,'ro',markersize=8)
+    pointLatest,=ax.plot(0,0,'ro',markersize=8)
+
+    pointMarker=['s','x','o','*']
+    pointSize=[4,8,6,10]
+    pointColor=['r','g','b','y']
+
+    def update(time):
+
+        showPos=(pos[0]-1)%len(x)
+        line.set_data(x[0:showPos+1],y[0:showPos+1])
+
+        pointRecord.set_data(x[0:showPos], y[0:showPos])
+        pointRecord.set_marker('.')
+        pointRecord.set_markersize(5)
+        pointRecord.set_color('k')
+
+        pointLatest.set_data([x[showPos]], [y[showPos]])
+        pointLatest.set_marker(pointMarker[time%len(pointMarker)])
+        pointLatest.set_markersize(pointSize[time%len(pointSize)])
+        pointLatest.set_color(pointColor[time%len(pointColor)])
+
+
+
+        return line,pointRecord,pointLatest
+
+    antiRecycle=FuncAnimation(fig,update,frames=range(100),interval=100,blit=True,repeat=True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum,modelName=""):
+
     nSample=trainDS.x.shape[0]
     nModel=len(aNN.paraModel)
     ite=0
@@ -135,6 +214,9 @@ def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum):
     trainsitionRate=0.1
     preLossValue=9999999999999.0
     zeroAppro=0.00001
+    queueOfAcc=multiprocessing.Queue(maxsize=10)
+    showProcess=multiprocessing.Process(target=showTrainProcess,name='showTrainProcess',kwargs={'size':1000,'queue':queueOfAcc,'modelName':modelName},daemon=True)
+    showProcess.start()
 
     for i in range(nModel):
         gradSum[i]=torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float)
@@ -193,8 +275,10 @@ def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum):
 
         
 
-        if i%100==1:
-            print("acc:",computeAcc(aNN,testDS)*100,"%")
+        if i%20==1:
+            acc=computeAcc(aNN,testDS)
+            print("acc:",acc*100,"%")
+            queueOfAcc.put(acc)
         #if i%10000==1:
         #   print("acc:",computeAcc(aNN,testDS,testDS.x.shape[0]))
 
@@ -206,6 +290,8 @@ def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum):
             pyplot.show()
         '''
     print("acc:",computeAcc(aNN,testDS,testDS.x.shape[0])*100,"%")
+    queueOfAcc.put(-1)
+    showProcess.terminate()
 
 
         

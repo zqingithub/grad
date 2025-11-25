@@ -1,11 +1,11 @@
-from tkinter import N
-import grad
 from gradMatrix import gradMatrix as gm
 import torch
 import aNNetwork
 from aNNetwork import actFunc
 from aNNetwork import typeOfLayer as tpLayer
 import gradMatrix
+
+
 
 '''
 torch.set_default_device('cuda')
@@ -109,17 +109,17 @@ layer[0]=aNNetwork.layer(layer=tpLayer.input,outputDim=trainDS.x.shape[1])
 layer[1]=aNNetwork.layer(layer=tpLayer.conv,kernelSize=5,channelSize=6)
 layer[2]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
 channelTable=torch.tensor([[1,0,0,0,1,1,1,0,0,1,1,1,1,0,1,1],\
-                           [1,1,0,0,0,1,1,1,0,0,1,1,1,1,0,1],\
-                           [1,1,1,0,0,0,1,1,1,0,0,1,0,1,1,1],\
-                           [0,1,1,1,0,0,1,1,1,1,0,0,1,0,1,1],\
-                           [0,0,1,1,1,0,0,1,1,1,1,0,1,1,0,1],\
-                           [0,0,0,1,1,1,0,0,1,1,1,1,0,1,1,1]],dtype=torch.long)
+                            [1,1,0,0,0,1,1,1,0,0,1,1,1,1,0,1],\
+                            [1,1,1,0,0,0,1,1,1,0,0,1,0,1,1,1],\
+                            [0,1,1,1,0,0,1,1,1,1,0,0,1,0,1,1],\
+                            [0,0,1,1,1,0,0,1,1,1,1,0,1,1,0,1],\
+                            [0,0,0,1,1,1,0,0,1,1,1,1,0,1,1,1]],dtype=torch.long)
 layer[3]=aNNetwork.layer(layer=tpLayer.conv,kernelSize=5,channelSize=16,channelTable=channelTable.T)
 layer[4]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
 layer[5]=aNNetwork.layer(layer=tpLayer.link,outputDim=120)
 layer[6]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
 cnn=aNNetwork.CNN(layer)
-aNNetwork.trainBySameStep(cnn,trainDS,testDS,50,0.1,10000000)
+aNNetwork.trainBySameStep(cnn,trainDS,testDS,50,0.1,2000)
 '''
 '''
 torch.set_default_device('cuda')
@@ -195,6 +195,8 @@ for i in rnn.paraModel:
 
 
 '''
+
+'''
 torch.set_default_device('cuda')
 trainDS,testDS=aNNetwork.getDataSet()
 layer=[aNNetwork.layer]*5
@@ -204,4 +206,30 @@ layer[2]=aNNetwork.layer(layer=tpLayer.link,outputDim=40)
 layer[3]=aNNetwork.layer(layer=tpLayer.link,outputDim=40,isRecurrent=True)
 layer[4]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
 rnn=aNNetwork.RNN_Bi(layer,numOfMaxRecurrent=4)
-aNNetwork.trainBySameStep(rnn,trainDS,testDS,50,0.1,2000)
+aNNetwork.trainBySameStep(rnn,trainDS,testDS,50,0.1,20000)
+'''
+
+def main():
+    if __name__ != "__main__":
+        return 
+    #leNet-5
+    torch.set_default_device('cuda')
+    trainDS,testDS=aNNetwork.getDataSet()
+    layer=[aNNetwork.layer]*7
+    layer[0]=aNNetwork.layer(layer=tpLayer.input,outputDim=trainDS.x.shape[1])
+    layer[1]=aNNetwork.layer(layer=tpLayer.conv,kernelSize=5,channelSize=6)
+    layer[2]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
+    channelTable=torch.tensor([[1,0,0,0,1,1,1,0,0,1,1,1,1,0,1,1],\
+                                [1,1,0,0,0,1,1,1,0,0,1,1,1,1,0,1],\
+                                [1,1,1,0,0,0,1,1,1,0,0,1,0,1,1,1],\
+                                [0,1,1,1,0,0,1,1,1,1,0,0,1,0,1,1],\
+                                [0,0,1,1,1,0,0,1,1,1,1,0,1,1,0,1],\
+                                [0,0,0,1,1,1,0,0,1,1,1,1,0,1,1,1]],dtype=torch.long)
+    layer[3]=aNNetwork.layer(layer=tpLayer.conv,kernelSize=5,channelSize=16,channelTable=channelTable.T)
+    layer[4]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
+    layer[5]=aNNetwork.layer(layer=tpLayer.link,outputDim=120)
+    layer[6]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
+    cnn=aNNetwork.CNN(layer)
+    aNNetwork.trainBySameStep(cnn,trainDS,testDS,50,0.1,2000,modelName='leNet-5(CNN)')
+
+main()
