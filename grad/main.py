@@ -229,7 +229,47 @@ def main():
     layer[4]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
     layer[5]=aNNetwork.layer(layer=tpLayer.link,outputDim=120)
     layer[6]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
-    cnn=aNNetwork.CNN(layer)
-    aNNetwork.trainBySameStep(cnn,trainDS,testDS,50,0.1,2000,modelName='leNet-5(CNN)')
+    cnn=aNNetwork.CNN(layer,modelName='leNet-5(CNN)')
+    aNNetwork.trainByAdamStep(cnn,trainDS,testDS,10,50000)
 
 main()
+
+'''
+
+def main():
+    if __name__ != "__main__":
+        return 
+    torch.set_default_device('cuda')
+    trainDS,testDS=aNNetwork.getDataSet()
+    layer=[aNNetwork.layer]*3
+    layer[0]=aNNetwork.layer(layer=tpLayer.input,outputDim=196)
+    layer[1]=aNNetwork.layer(layer=tpLayer.link,outputDim=60,isRecurrent=True)
+    layer[2]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
+    rnn=aNNetwork.RNN_Bi(layer,numOfMaxRecurrent=4)
+    aNNetwork.trainByAdamStep(rnn,trainDS,testDS,10,50000)
+
+main()
+
+'''
+
+'''
+def main():
+    if __name__ != "__main__":
+        return 
+    torch.set_default_device('cuda')
+    trainDS,testDS=aNNetwork.getDataSet()
+    layer=[aNNetwork.layer]*8
+    layer[0]=aNNetwork.layer(layer=tpLayer.input,outputDim=196)
+    layer[1]=aNNetwork.layer(layer=tpLayer.link,outputDim=20,isShortCircuit=True)
+    layer[2]=aNNetwork.layer(layer=tpLayer.link,outputDim=20,isRecurrent=True)
+    layer[3]=aNNetwork.layer(layer=tpLayer.link,outputDim=20,isShortCircuit=True)
+    layer[4]=aNNetwork.layer(layer=tpLayer.link,outputDim=20,isRecurrent=True,isShortCircuit=True)
+    layer[5]=aNNetwork.layer(layer=tpLayer.link,outputDim=20)
+    layer[6]=aNNetwork.layer(layer=tpLayer.link,outputDim=20,isRecurrent=True)
+    layer[7]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
+    rnn=aNNetwork.RNN_Bi(layer,numOfMaxRecurrent=4)
+    aNNetwork.trainByAdamStep(rnn,trainDS,testDS,10,50000)
+
+main()
+
+'''

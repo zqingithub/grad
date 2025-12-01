@@ -1,3 +1,4 @@
+import json
 import time
 import numpy
 import torchvision
@@ -32,6 +33,12 @@ class poolMethod(Enum):
     maxPool=0
     avePool=1
 
+class modelType(Enum):
+    FNN=0
+    FNN_res=1
+    CNN=2
+    RNN=3
+    RNN_Bi=4
 
 
 def sigmoid(input):
@@ -198,36 +205,65 @@ def drawLine(x,y,pos=[],modelName=""):
     plt.tight_layout()
     plt.show()
 
+def modelSave(model,path):
+    modelInfo={}
+    path=path+model.modelName+'.json'
+    with open(path,"w") as modelFile:
+        if model.modelType==modelType.FNN:
+            modelInfo['modelName']=model.modelName
+            modelInfo['modelType']=model.modelType
+            modelInfo['numNodes']=model.numNodes
+            modelInfo['actFun']=model.actFun
+            paraModel=[]
+            for i in model.paraModel:
+                paraModel.append(i.value)
+            modelInfo['paraModel']=paraModel
+            json.dump(modelInfo,modelFile)
+            
+
+def modelLoad(path):
+    with open(path,"r") as modelFile:
+        modelInfo=json.load(modelFile)
+        if modelInfo['modelType']==modelType.FNN:
+            aNN=FNN(numNodes=modelInfo['numNodes'],actFun=modelInfo['actFun'],modelName=modelInfo['modelName'])
+            for i in len(aNN.paraModel):
+                aNN.paraModel[i].value=modelInfo['paraModel'][i].value.clone()
+            return aNN
+    return None
 
 
-def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum,modelName=""):
+def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum,preIndex=0.9,minRound=2,showXSiez=0,gapToAcc=0):
 
     nSample=trainDS.x.shape[0]
     nModel=len(aNN.paraModel)
     ite=0
-    gradSum=[type(aNN.paraModel[0].grad)]*nModel
-    gradPre=[type(aNN.paraModel[0].grad)]*nModel
+    gradSum=[]
+    gradPre=[]
     preIndexTrainsition=0.01
-    preIndex=0.9
     riseTolerate=10
     curRiseN=0
     trainsitionRate=0.1
     preLossValue=9999999999999.0
     zeroAppro=0.00001
+
+    if gapToAcc==0:
+        gapToAcc=200
+    if showXSiez==0:
+        showXSiez=200
+
     queueOfAcc=multiprocessing.Queue(maxsize=10)
-    showProcess=multiprocessing.Process(target=showTrainProcess,name='showTrainProcess',kwargs={'size':1000,'queue':queueOfAcc,'modelName':modelName},daemon=True)
+    showProcess=multiprocessing.Process(target=showTrainProcess,name='showTrainProcess',kwargs={'size':showXSiez,'queue':queueOfAcc,'modelName':aNN.modelName},daemon=True)
     showProcess.start()
 
     for i in range(nModel):
-        gradSum[i]=torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float)
-        gradPre[i]=torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float)
+        gradSum.append(torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float))
+        gradPre.append(torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float))
 
     for i in range(iteNum):
         
         for k in gradSum:
             k.zero_()
 
-        minRound=10
         lossValueSum=0.0
 
         for m in range(minRound):
@@ -275,12 +311,10 @@ def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum,modelName=""):
 
         
 
-        if i%20==1:
+        if i%gapToAcc==1:
             acc=computeAcc(aNN,testDS)
             print("acc:",acc*100,"%")
             queueOfAcc.put(acc)
-        #if i%10000==1:
-        #   print("acc:",computeAcc(aNN,testDS,testDS.x.shape[0]))
 
         '''
         if i%1000==0:
@@ -289,16 +323,134 @@ def trainBySameStep(aNN,trainDS,testDS,batchSize,step,iteNum,modelName=""):
             pyplot.imshow(aNN.x.value.reshape(28,28).cpu())
             pyplot.show()
         '''
+
     print("acc:",computeAcc(aNN,testDS,testDS.x.shape[0])*100,"%")
     queueOfAcc.put(-1)
     showProcess.terminate()
 
 
+def rollModelPara(para):
+    for ite in para:
+        tempValue=ite.value.view(-1)
+        for i in range(tempValue.shape[0]):
+            pos=random.randint(i,tempValue.shape[0]-1)
+            ex=tempValue[pos].item()
+            tempValue[pos]=tempValue[i]
+            tempValue[i]=ex
+
+
+
+def trainByAdamStep(aNN,trainDS,testDS,batchSize,iteNum,step=1,beta1=0.9,beta2=0.999,esp=1e-8,minRound=2,showXSiez=0,gapToAcc=0):
+
+    nSample=trainDS.x.shape[0]
+    nModel=len(aNN.paraModel)
+    ite=0
+    gradSum=[]
+    gradPre=[]
+    gradTotal=[]
+    preIndexTrainsition=0.01
+    riseTolerate=10
+    curRiseN=0
+    trainsitionRate=0.1
+    preLossValue=9999999999999.0
+    zeroAppro=0.00001
+    adjust1=beta1
+    adjust2=beta2
+
+    if gapToAcc==0:
+        gapToAcc=200
+    if showXSiez==0:
+        showXSiez=200
+
+    queueOfAcc=multiprocessing.Queue(maxsize=10)
+    showProcess=multiprocessing.Process(target=showTrainProcess,name='showTrainProcess',kwargs={'size':showXSiez,'queue':queueOfAcc,'modelName':aNN.modelName},daemon=True)
+    showProcess.start()
+
+    for i in range(nModel):
+        gradSum.append(torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float))
+        gradPre.append(torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float))
+        gradTotal.append(torch.zeros(aNN.paraModel[i].grad.shape,dtype=torch.float))
+
+    for i in range(iteNum):
+        
+        for k in gradSum:
+            k.zero_()
+
+        lossValueSum=0.0
+
+        for m in range(minRound):
+            tempItem=ite
+            lossValueSum=0.0
+            for k in gradSum:
+                k.zero_()
+            for j in range(batchSize):
+
+                aNN.setX(trainDS.x[tempItem%nSample].unsqueeze(0))
+                aNN.setRealY(trainDS.y[tempItem%nSample].unsqueeze(0))
+                aNN.computeValue()
+                lossValueSum+=aNN.getLossValue()
+                aNN.computeGrad()
+                for k in range(nModel):
+                    gradSum[k]=gradSum[k]+aNN.paraModel[k].grad
+                tempItem=tempItem+1
+
+            for k in range(nModel):
+                gradPre[k]=beta1*gradPre[k]+((1-beta1)/batchSize)*gradSum[k]
+                gradTotal[k]=beta2*gradTotal[k]+((1-beta2)/batchSize/batchSize)*gradSum[k]*gradSum[k]
+                aNN.paraModel[k].value=aNN.paraModel[k].value-gradPre[k]*(step/(1-adjust1))/(torch.sqrt(gradTotal[k]*(1/(1-adjust2))+esp))
+            adjust1*=beta1
+            adjust2*=beta2
+
+            lossValueSum=lossValueSum/batchSize
+            print("round:",i,":",m,"lossValue:",lossValueSum)
+            if lossValueSum>preLossValue:
+                curRiseN+=1
+            else:
+                curRiseN-=1
+            if curRiseN<0:
+                curRiseN=0
+            if curRiseN>riseTolerate:
+                curRiseN=0
+                for g in aNN.paraModel:
+                    tempIndex=torch.abs(g.grad)<zeroAppro
+                    tempRate=trainsitionRate*(torch.randint(0,2,g.value.shape)*2-1)+1
+                    g.value[tempIndex]=g.value[tempIndex]*tempRate[tempIndex]
+                for g in range(nModel):
+                    gradPre[g]=gradPre[g]*preIndexTrainsition
+                print("trainsition")
+
+            preLossValue=lossValueSum
+
+        ite=ite+batchSize
+
+
+        
+
+        if i%gapToAcc==1:
+            acc=computeAcc(aNN,testDS)
+            print("acc:",acc*100,"%")
+            queueOfAcc.put(acc)
+
+        '''
+        if i%1000==0:
+            pyplot.figure(figsize=(8,8))
+            pyplot.title(aNN.realY.value.cpu())
+            pyplot.imshow(aNN.x.value.reshape(28,28).cpu())
+            pyplot.show()
+        '''
+
+    print("acc:",computeAcc(aNN,testDS,testDS.x.shape[0])*100,"%")
+    queueOfAcc.put(-1)
+    showProcess.terminate()
         
 
 #全连接神经网络 Feedforward Neural Network
 class FNN:
-    def __init__(self,numNodes,actFun=None):
+    def __init__(self,numNodes,actFun=None,modelName='FNN'):
+        self.modelName=modelName
+        self.modelType=modelType.FNN
+        self.numNodes=numNodes
+        self.actFun=actFun
         self.numLayer=len(numNodes)
         self.x=GM(torch.zeros((1,numNodes[0]),dtype=torch.float))
         self.y=None
@@ -342,7 +494,11 @@ class FNN:
 
 
 class FNN_res:
-    def __init__(self,numNodes,actFun=None):
+    def __init__(self,numNodes,actFun=None,modelName='FNN_res'):
+        self.modelName=modelName
+        self.modelType=modelType.FNN_res
+        self.numNodes=numNodes
+        self.actFun=actFun
         self.numLayer=len(numNodes)
         self.x=GM(torch.zeros((1,numNodes[0]),dtype=torch.float))
         self.y=None
@@ -408,7 +564,10 @@ class layer:
 
 #卷积神经网络 Convolutional Neural Network
 class CNN:
-    def __init__(self,layer):
+    def __init__(self,layer,modelName='CNN'):
+        self.modelName=modelName
+        self.modelType=modelType.CNN
+        self.layer=layer
         self.x=None
         self.realY=None
         self.y=None
@@ -609,8 +768,11 @@ class RNN:
         return sum/4
 '''
 class RNN:
-    def __init__(self,layer,numOfMaxRecurrent=10):
-        #layer[-1].isRecurrent=False
+    def __init__(self,layer,numOfMaxRecurrent=10,modelName='RNN'):
+        self.modelName=modelName
+        self.modelType=modelType.RNN
+        self.layer=layer
+        self.numOfMaxRecurrent=numOfMaxRecurrent
         numOfMaxRecurrent+=1
         self.nowRecurrent=0
         self.x=None
@@ -756,10 +918,10 @@ class RNN:
                 
 
     def setX(self,value):
-        tempX=value.reshape([28,28])
+        temp=value.reshape([28,28])
         self.nowRecurrent=4
         for i in range(self.nowRecurrent):
-            self.xList[i].value=tempX[:,i:i+7].reshape(1,196)
+            self.xList[i].value=temp[:,i:i+7].reshape(1,196)
 
     def setRealY(self,value):
         for i in range(0,self.nowRecurrent):
@@ -792,8 +954,11 @@ class RNN:
 
 #循环神经网络 Bidirectional Recurrent Neural Network
 class RNN_Bi:
-    def __init__(self,layer,numOfMaxRecurrent=10):
-        #layer[-1].isRecurrent=False
+    def __init__(self,layer,numOfMaxRecurrent=10,modelName='RNN_Bi'):
+        self.modelName=modelName
+        self.modelType=modelType.RNN_Bi
+        self.layer=layer
+        self.numOfMaxRecurrent=numOfMaxRecurrent
         numOfMaxRecurrent+=1
         self.nowRecurrent=0
         self.x=None
@@ -989,10 +1154,10 @@ class RNN_Bi:
                 
 
     def setX(self,value):
-        tempX=value.reshape([28,28])
+        temp=value.reshape([28,28])
         self.nowRecurrent=4
         for i in range(self.nowRecurrent):
-            self.xList[i].value=tempX[:,i:i+7].reshape(1,196)
+            self.xList[i].value=temp[:,i:i+7].reshape(1,196)
 
     def setRealY(self,value):
         for i in range(0,self.nowRecurrent):
