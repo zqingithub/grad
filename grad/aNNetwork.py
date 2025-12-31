@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import torch
 from gradMatrix import gradMatrix as GM
-import grad
 import random
 from enum import Enum
 import math
 import multiprocessing
 import threading
+import gradMatrix
 
 
 class actFunc(Enum):
@@ -340,7 +340,7 @@ def rollModelPara(para):
 
 
 
-def trainByAdamStep(aNN,trainDS,testDS,batchSize,iteNum,step=1,beta1=0.9,beta2=0.999,esp=1e-8,minRound=2,showXSiez=0,gapToAcc=0):
+def trainByAdamStep(aNN,trainDS,testDS,batchSize,iteNum,step=0.01,beta1=0.9,beta2=0.999,esp=1e-8,minRound=2,showXSiez=0,gapToAcc=0):
 
     nSample=trainDS.x.shape[0]
     nModel=len(aNN.paraModel)
@@ -458,9 +458,9 @@ class FNN:
         self.numNodes=numNodes
         self.paraModel=[GM]*(self.numLayer-1)
         for i in range(self.numLayer-1):
-            self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),grad.Type.gradVariable)
+            self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),gradMatrix.variableType.gradVariable)
             self.paraModel[i].value+=torch.rand(self.paraModel[i].value.shape,dtype=torch.float)/(self.numNodes[i]+1)
-            #self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),grad.Type.gradVariable)
+            #self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),gradMatrix.variableType.gradVariable)
         #self.paraModel[self.numLayer-2].value-=0.5
         self.actFun=actFun
         if self.actFun==None:
@@ -508,12 +508,12 @@ class FNN_res:
         self.numNodes=numNodes
         self.paraModel=[GM]*(self.numLayer-1)
         for i in range(self.numLayer-1):
-            self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),grad.Type.gradVariable)
+            self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),gradMatrix.variableType.gradVariable)
             self.paraModel[i].value+=torch.rand(self.paraModel[i].value.shape,dtype=torch.float)/(self.numNodes[i]+1)
-            #self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),grad.Type.gradVariable)
+            #self.paraModel[i]=GM(torch.zeros((self.numNodes[i]+1,self.numNodes[i+1]),dtype=torch.float),gradMatrix.variableType.gradVariable)
         #self.paraModel[self.numLayer-2].value-=0.5
         if self.numLayer>3:
-            self.paraModel[-1]=GM(torch.zeros((numBeforeOutput+1,self.numNodes[-1]),dtype=torch.float),grad.Type.gradVariable)
+            self.paraModel[-1]=GM(torch.zeros((numBeforeOutput+1,self.numNodes[-1]),dtype=torch.float),gradMatrix.variableType.gradVariable)
             self.paraModel[-1].value+=torch.rand(self.paraModel[-1].value.shape,dtype=torch.float)/(numBeforeOutput+1)
         self.actFun=actFun
         if self.actFun==None:
@@ -587,7 +587,7 @@ class CNN:
                     raise TypeError("conv pre-layer is not right")
                 mask=torch.ones(layer[iterLayer].channelSize,layer[iterLayer-1].channelSize,\
                                 layer[iterLayer].kernelSize,layer[iterLayer].kernelSize,dtype=torch.float)
-                self.paraModel.append(GM(torch.rand(mask.shape,dtype=torch.float),grad.Type.gradVariable))
+                self.paraModel.append(GM(torch.rand(mask.shape,dtype=torch.float),gradMatrix.variableType.gradVariable))
                 if layer[iterLayer].channelTable!=None:
                     for i in range(layer[iterLayer].channelSize):
                         for j in range(layer[iterLayer-1].channelSize):
@@ -600,7 +600,7 @@ class CNN:
                     kernel=kernel*GM(mask)
                 self.y=self.y.conv2D(kernel)
                 self.paraModel.append(GM(torch.rand(1,layer[iterLayer].channelSize,1,1,\
-                    dtype=torch.float)/(torch.sum(mask[i])+1),grad.Type.gradVariable))
+                    dtype=torch.float)/(torch.sum(mask[i])+1),gradMatrix.variableType.gradVariable))
                 self.y=self.y+self.paraModel[-1].repeat([1,1,self.y.value.shape[2],self.y.value.shape[3]])
                 self.y=doActivation(self.y,layer[iterLayer].actFunc)
 
@@ -611,10 +611,10 @@ class CNN:
                 self.y=self.__doPool(self.y,layer[iterLayer].poolMethod,layer[iterLayer].kernelSize)
                 if layer[iterLayer].actFunc!=actFunc.Non:
                     self.paraModel.append(GM(torch.rand(1,layer[iterLayer].channelSize,\
-                        1,1,dtype=torch.float)/2,grad.Type.gradVariable))
+                        1,1,dtype=torch.float)/2,gradMatrix.variableType.gradVariable))
                     self.y=self.y*(self.paraModel[-1].repeat([1,1,self.y.value.shape[2],self.y.value.shape[3]]))
                     self.paraModel.append(GM(torch.rand(1,layer[iterLayer].channelSize,\
-                        1,1,dtype=torch.float)/2,grad.Type.gradVariable))
+                        1,1,dtype=torch.float)/2,gradMatrix.variableType.gradVariable))
                     self.y=self.y+(self.paraModel[-1].repeat([1,1,self.y.value.shape[2],self.y.value.shape[3]]))
                     self.y=doActivation(self.y,layer[iterLayer].actFunc)
 
@@ -625,7 +625,7 @@ class CNN:
                     self.y=self.y.reshape([1,self.y.value.shape[1]*self.y.value.shape[2]*self.y.value.shape[3]])
                 self.y=GM.cat(self.y,GM(torch.ones(1,1,dtype=torch.float)),1)
                 self.paraModel.append(GM(torch.rand(self.y.value.shape[1],\
-                                layer[iterLayer].outputDim,dtype=torch.float)/self.y.value.shape[1],grad.Type.gradVariable))
+                                layer[iterLayer].outputDim,dtype=torch.float)/self.y.value.shape[1],gradMatrix.variableType.gradVariable))
                 self.y=doActivation(self.y@self.paraModel[-1],layer[iterLayer].actFunc)
 
         self.realY=GM(torch.zeros(self.y.value.shape,dtype=torch.float))
@@ -684,7 +684,7 @@ class RNN:
                     self.y[0]=GM.cat(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float)),self.y[0],1)
                     self.recurrentCat[0].append(self.y[0])
                 self.paraModel.append(GM(torch.rand(self.y[0].value.shape[1],\
-                                layer[iterLayer].outputDim,dtype=torch.float)/self.y[0].value.shape[1],grad.Type.gradVariable))
+                                layer[iterLayer].outputDim,dtype=torch.float)/self.y[0].value.shape[1],gradMatrix.variableType.gradVariable))
                 self.y[0]=doActivation(self.y[0]@self.paraModel[-1],layer[iterLayer].actFunc)
                 if layer[iterLayer].isRecurrent==True:
                     self.recurrentOutput[0].append(self.y[0])
@@ -801,12 +801,12 @@ class RNN:
 
             if layer[iterLayer].typeOfLayer==typeOfLayer.link:
                 if layer[iterLayer].isRecurrent==True:
-                    self.recurrentForwordInput.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float),type=grad.Type.gradVariable))
+                    self.recurrentForwordInput.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
                     self.recurrentZero.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float)))
                     self.y=GM.cat(self.recurrentForwordInput[-1],self.y,1)
                 self.y=GM.cat(self.y,GM(torch.ones(1,1,dtype=torch.float)),1)
                 self.paraModel.append(GM(torch.rand(self.y.value.shape[1],\
-                                layer[iterLayer].outputDim,dtype=torch.float)/self.y.value.shape[1],grad.Type.gradVariable))
+                                layer[iterLayer].outputDim,dtype=torch.float)/self.y.value.shape[1],gradMatrix.variableType.gradVariable))
                 self.y=doActivation(self.y@self.paraModel[-1],layer[iterLayer].actFunc)
                 if layer[iterLayer].isRecurrent==True:
                     self.recurrentOutput.append(self.y)
@@ -820,10 +820,10 @@ class RNN:
 
 
         for ite in self.paraModel:
-            self.paraModelStore.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=grad.Type.gradVariable))
+            self.paraModelStore.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
 
         for ite in self.recurrentZero:
-            self.preGrad.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=grad.Type.gradVariable))
+            self.preGrad.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
 
         for ite in self.paraModel:
             self.allPara.append(ite)
@@ -989,14 +989,14 @@ class RNN_Bi:
 
             if layer[iterLayer].typeOfLayer==typeOfLayer.link:
                 if layer[iterLayer].isRecurrent==True:
-                    self.recurrentForwordInput.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float),type=grad.Type.gradVariable))
+                    self.recurrentForwordInput.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
                     self.recurrentZero.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float)))
                     self.y=GM.cat(self.recurrentForwordInput[-1],self.y,1)
-                    self.recurrentBackwordInput.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float),type=grad.Type.gradVariable))
+                    self.recurrentBackwordInput.append(GM(torch.zeros(1,layer[iterLayer].outputDim,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
                     self.y=GM.cat(self.y,self.recurrentBackwordInput[-1],1)
                 self.y=GM.cat(self.y,GM(torch.ones(1,1,dtype=torch.float)),1)
                 self.paraModel.append(GM(torch.rand(self.y.value.shape[1],\
-                                layer[iterLayer].outputDim,dtype=torch.float)/self.y.value.shape[1],grad.Type.gradVariable))
+                                layer[iterLayer].outputDim,dtype=torch.float)/self.y.value.shape[1],gradMatrix.variableType.gradVariable))
                 self.y=doActivation(self.y@self.paraModel[-1],layer[iterLayer].actFunc)
                 if layer[iterLayer].isRecurrent==True:
                     self.recurrentOutput.append(self.y)
@@ -1010,10 +1010,10 @@ class RNN_Bi:
 
 
         for ite in self.paraModel:
-            self.paraModelStore.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=grad.Type.gradVariable))
+            self.paraModelStore.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
 
         for ite in self.recurrentZero:
-            self.preGrad.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=grad.Type.gradVariable))
+            self.preGrad.append(GM(torch.zeros(ite.value.shape,dtype=torch.float),type=gradMatrix.variableType.gradVariable))
 
         for ite in self.paraModel:
             self.allPara.append(ite)

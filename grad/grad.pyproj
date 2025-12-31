@@ -29,15 +29,15 @@
     <Compile Include="aNNetwork.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="grad.py">
-      <SubType>Code</SubType>
-    </Compile>
+    <Compile Include="artificial_neural_network.py" />
+    <Compile Include="auxiliary_tools.py" />
     <Compile Include="gradMatrix.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="optimization.py" />
   </ItemGroup>
   <!-- Uncomment the CoreCompile target to enable the Build command in
        Visual Studio and specify your pre- and post-build commands in
