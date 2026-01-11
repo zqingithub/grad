@@ -26,9 +26,6 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="aNNetwork.py">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="artificial_neural_network.py" />
     <Compile Include="auxiliary_tools.py" />
     <Compile Include="gradMatrix.py">

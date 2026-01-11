@@ -46,9 +46,12 @@ def trainBySameStep(aNN:ANN,trainDS:dataSet,testDS:dataSet,step:float,gradClip:f
         
         if (i+1)*1.0/iteNum*showXSiez>showN:
             showN+=1
-            acc=computeAcc(aNN,testDS)
-            print("acc:",acc*100,"%")
-            queueOfAcc.put(acc)
+            accTest=computeAcc(aNN,testDS)
+            print("test_acc:",accTest*100,"%")
+            accTrain=computeAcc(aNN,trainDS)
+            print("train_acc:",accTrain*100,"%")
+            queueOfAcc.put(accTest)
+            queueOfAcc.put(accTrain)
 
         '''
         if i%1000==0:
@@ -60,15 +63,20 @@ def trainBySameStep(aNN:ANN,trainDS:dataSet,testDS:dataSet,step:float,gradClip:f
 
     aNN.createFinishModel()
     aNN.updateParaToFinishModel()
-    print("testDate_acc:",computeAcc(aNN,testDS,testDS.x.shape[0],True)*100,"%")
+    print("testDate_acc:",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=False)*100,"%")
     if aNN.batchSize>1:
         isHaveBatchNormalization=False
         for i in aNN.layerInfo:
             if i.typeOfLayer==typeOfLayer.batchNormalization:
                 isHaveBatchNormalization=True
         if isHaveBatchNormalization:
+            print("testDate_acc(not use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True)*100,"%")
+            if aNN.numOfMaxRecurrent>1:
+                print("testDate_acc(not use train data to compute bnPara,not use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=False)*100,"%")
             aNN.updateParaToFinishModel(isUseTrainData=True,trainData=trainDS.x)
-            print("testDate_acc(use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],True)*100,"%")
+            print("testDate_acc(use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True)*100,"%")
+            if aNN.numOfMaxRecurrent>1:
+                print("testDate_acc(use train data to compute bnPara,use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=True)*100,"%")
     input("please input enter key to end the train")
     queueOfAcc.put(-1)
     showProcess.terminate()
@@ -131,9 +139,12 @@ def trainByAdamStep(aNN:ANN,trainDS:dataSet,testDS:dataSet,round:float=1.2,step:
 
         if (i+1)*1.0/iteNum*showXSiez>showN:
             showN+=1
-            acc=computeAcc(aNN,testDS)
-            print("acc:",acc*100,"%")
-            queueOfAcc.put(acc)
+            accTest=computeAcc(aNN,testDS)
+            print("test_acc:",accTest*100,"%")
+            accTrain=computeAcc(aNN,trainDS)
+            print("train_acc:",accTrain*100,"%")
+            queueOfAcc.put(accTest)
+            queueOfAcc.put(accTrain)
 
         '''
         if i%1000==0:
@@ -145,15 +156,20 @@ def trainByAdamStep(aNN:ANN,trainDS:dataSet,testDS:dataSet,round:float=1.2,step:
 
     aNN.createFinishModel()
     aNN.updateParaToFinishModel()
-    print("testDate_acc:",computeAcc(aNN,testDS,testDS.x.shape[0],True)*100,"%")
+    print("testDate_acc:",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=False)*100,"%")
     if aNN.batchSize>1:
         isHaveBatchNormalization=False
         for i in aNN.layerInfo:
             if i.typeOfLayer==typeOfLayer.batchNormalization:
                 isHaveBatchNormalization=True
         if isHaveBatchNormalization:
+            print("testDate_acc(not use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True)*100,"%")
+            if aNN.numOfMaxRecurrent>1:
+                print("testDate_acc(not use train data to compute bnPara,not use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=False)*100,"%")
             aNN.updateParaToFinishModel(isUseTrainData=True,trainData=trainDS.x)
-            print("testDate_acc(use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],True)*100,"%")
+            print("testDate_acc(use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True)*100,"%")
+            if aNN.numOfMaxRecurrent>1:
+                print("testDate_acc(use train data to compute bnPara,use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=True)*100,"%")
     input("please input enter key to end the train")
     queueOfAcc.put(-1)
     showProcess.terminate()
