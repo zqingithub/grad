@@ -1,3 +1,4 @@
+﻿#在构建神经网络的过程中，同时构建计算图，后续通过计算图可以自动求模型参数的梯度，自动求梯度的方法采用自上向下的方法
 from __future__ import annotations
 from ast import Dict, List
 import copy
@@ -6,11 +7,20 @@ import torch
 from enum import Enum
 
 class variableType(Enum):
-	num=0
-	midVariable=1
-	gradVariable=2
+    """
+    用于定义计算图中节点的类型：
+    num：表示节点用于接收模型的非参数输入
+    midVaraiable:表示计算图生成过程中的中间变量
+    gradVariable:表示模型的参数,后续会计算该节点的梯度
+    """
+    num=0
+    midVariable=1
+    gradVariable=2
 
 class operatorType(Enum):
+    """
+    用于表示计算图中间变量的操作（或计算）的类型
+    """
     add=0
     sub=1
     mul=2
@@ -39,6 +49,22 @@ class operatorType(Enum):
 class gradMatrix:
 
     def __init__(self,value:torch.tensor=None,type:variableType=variableType.num):
+        """
+        用于表示计算图中的一个节点
+        left：节点对应操作的第一个操作数（也用gradMatrix类对象表示）
+        right：节点对应操作的第二个操作数（也用gradMatrix类对象表示）
+        value：用于记录节点在计算图计算过程中的计算值
+        type：节点的类型
+        oper：节点对应操作的类型
+        grad：假如节点表示的是模型的参数，则用grad记录参数的梯度
+        numOfShare：用于记录有多少个节点把当前的节点用于计算（即有操作数指针指向当前节点），用于避免计算图计算或参数求梯度过程中的重复计算
+        counterCompute：用于记录在计算图计算过程中节点被请求计算的次数，用于避免重复计算，当counterCompute大于0时表示已被请求过，
+                        则直接返回value记录的计算值，当和numOfShare一样时，则表示所有把当前节点当作操作数的节点已全部请求过当前节点的计算值，
+                        可以重置计算结果。
+        counterGrad：作用和counterCompute类似，表示在求模型参数梯度的过程中，有多少个把当前节点当作操作数的节点已将梯度累加至sumOfGrad（计算当前节点梯度时需要用到的由上传递下来的梯度）
+                     中，当和numOfShare一样时，则表示所有把当前节点当作操作数的节点已全部完成梯度的计算，当前节点在计算梯度过程中需要用到的sumOfGrad值已计算完成，可以开始当前节点的梯度计算
+        sumOfGrad：用于累加所有把当前节点当作操作数的节点传递过来的梯度
+        """
         self.left:gradMatrix=None
         self.right:gradMatrix=None
         self.value:torch.tensor=value

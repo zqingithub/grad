@@ -1,3 +1,4 @@
+﻿#优化器的实现，分别时固定学习率优化器和Adma优化器
 from __future__ import annotations
 from ast import List
 import torch
@@ -76,7 +77,7 @@ def trainBySameStep(aNN:ANN,trainDS:dataSet,testDS:dataSet,step:float,gradClip:f
             aNN.updateParaToFinishModel(isUseTrainData=True,trainData=trainDS.x)
             print("testDate_acc(use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True)*100,"%")
             if aNN.numOfMaxRecurrent>1:
-                print("testDate_acc(use train data to compute bnPara,use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=True)*100,"%")
+                print("testDate_acc(use train data to compute bnPara,not use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=False)*100,"%")
     input("please input enter key to end the train")
     queueOfAcc.put(-1)
     showProcess.terminate()
@@ -169,7 +170,7 @@ def trainByAdamStep(aNN:ANN,trainDS:dataSet,testDS:dataSet,round:float=1.2,step:
             aNN.updateParaToFinishModel(isUseTrainData=True,trainData=trainDS.x)
             print("testDate_acc(use train data to compute bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True)*100,"%")
             if aNN.numOfMaxRecurrent>1:
-                print("testDate_acc(use train data to compute bnPara,use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=True)*100,"%")
+                print("testDate_acc(use train data to compute bnPara,not use per time bnPara):",computeAcc(aNN,testDS,testDS.x.shape[0],isUseFinishModel=True,isUseBnParaPerTime=False)*100,"%")
     input("please input enter key to end the train")
     queueOfAcc.put(-1)
     showProcess.terminate()

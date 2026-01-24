@@ -1,3 +1,4 @@
+﻿#用于实现一些辅助功能，例如数据集导入，准确率计算，训练过程可视化等
 from __future__ import annotations
 from ast import List, Tuple
 from multiprocessing import Queue

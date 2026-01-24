@@ -1,4 +1,4 @@
-from __future__ import annotations
+Ôªøfrom __future__ import annotations
 from ast import List
 from artificial_neural_network import ANN, GM, actFunc, layerInfo, lossFunc, poolMethod, recurrentLinkMode, recurrentTimeWeightModel, typeOfLayer
 import auxiliary_tools
@@ -20,18 +20,21 @@ def main():
     infoOfLayer:List[layerInfo]=[]
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[trainDS.x.shape[4],trainDS.x.shape[5]]]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.reshape,kernelSize=[[1,1]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[90]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[80],isRecurrent=True))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.batchNormalization))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[70],isRecurrent=True))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.softMax]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
-    ann=ANN(modelName='rnn',batchSize=1,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier)
-    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy)
+    ann=ANN(modelName='rnn_Bi_perceptron_bn',batchSize=50,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier,isBidirectional=True)
+    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy,isCheckShare=False)
     trainByAdamStep(ann,trainDS,testDS,round=20,step=0.001,minRound=1)
 
 #======================================================================================================================================================
 main()
 
 
-#Ã›∂»≤‚ ‘
+#Ê¢ØÂ∫¶ÊµãËØï
 '''
     infoOfLayer:List[layerInfo]=[]
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[2,2]]))
@@ -67,10 +70,10 @@ main()
     for i in temp:
         print(i)
 '''
-#∏–÷™ª˙ 
+#ÊÑüÁü•Êú∫ 
 #============================================================================================================================================
   
-    #ºÚ∞Ê acc:96.34%
+    #ÁÆÄÁâà acc:96.34%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     infoOfLayer:List[layerInfo]=[]
@@ -83,7 +86,7 @@ main()
     ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy)
     trainByAdamStep(ann,trainDS,testDS,round=20,step=0.001,minRound=1)
 '''
-    #≈˙πÈ“ªªØ∞Ê acc:96.48%
+    #ÊâπÂΩí‰∏ÄÂåñÁâà acc:96.48%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     infoOfLayer:List[layerInfo]=[]
@@ -101,10 +104,10 @@ main()
 '''
 
 
-#…Ó∂»≤–≤Ó∏–÷™ª˙
+#Ê∑±Â∫¶ÊÆãÂ∑ÆÊÑüÁü•Êú∫
 #============================================================================================================================================
 
-    #ºÚ∞Ê acc:97.03%
+    #ÁÆÄÁâà acc:97.03%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     infoOfLayer:List[layerInfo]=[]
@@ -135,7 +138,7 @@ main()
     trainByAdamStep(ann,trainDS,testDS,round=20,step=0.0001,minRound=1)
 '''
     
-    #≈˙πÈ“ªªØ∞Ê acc:96.35%
+    #ÊâπÂΩí‰∏ÄÂåñÁâà acc:96.35%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     infoOfLayer:List[layerInfo]=[]
@@ -170,52 +173,70 @@ main()
 
 
 
-#leNet-5
+#Âç∑ÁßØÁ•ûÁªèÁΩëÁªú
 #============================================================================================================================================
+   
+    #leNet-5 acc:98.86%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     infoOfLayer:List[layerInfo]=[]
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[trainDS.x.shape[4],trainDS.x.shape[5]]]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[6],kernelSize=[[5,5]]))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.maxPool],kernelSize=[[2,2]]))
-    cTable=[[0,1,2],[1,2,3],[2,3,4],[3,4,5],[0,4,5],[0,1,5],[0,1,2,3],[1,2,3,4],[2,3,4,5],[0,3,4,5],[0,1,4,5],[0,1,2,5],[0,1,3,4],[1,2,4,5],[0,2,3,5],[0,1,2,3,4,5]]
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[16],kernelSize=[[5,5]],channelTable=cTable))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.avePool],kernelSize=[[2,2]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[16],kernelSize=[[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.maxPool],kernelSize=[[2,2]]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.reshape,kernelSize=[[1,1]]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[120]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.norm]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
     ann=ANN(modelName='leNet-5',batchSize=1)
-    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy)
-    trainByAdamStep(ann,trainDS,testDS,round=40,step=0.0001,minRound=1)
+    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.L2)
+    trainBySameStep(ann,trainDS,testDS,round=20,step=0.1,minRound=1)
 '''
 
-  #2
-
+    #ÂçïÂ∞∫ÂØ∏Âç∑ÁßØÊ†∏ acc:98.88%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     infoOfLayer:List[layerInfo]=[]
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[trainDS.x.shape[4],trainDS.x.shape[5]]]))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[10,10],kernelSize=[[3,3],[5,5]]))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[10,10],kernelSize=[[3,3],[5,5]]))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.avePool],kernelSize=[[2,2]]))
-    cTable=[[0,1,2,3],[1,2,3,4],[2,3,4,5],[3,4,5,6],[4,5,6,7],[5,6,7,8],[6,7,8,9],[7,8,9,0],[8,9,0,1],[9,0,1,2],[0,2,4,6],[2,4,6,8],[1,3,5,7],[3,5,7,9],[0,2,4,6,8],[1,3,5,7,9],\
-            [0,1,2,3],[1,2,3,4],[2,3,4,5],[3,4,5,6],[4,5,6,7],[5,6,7,8],[6,7,8,9],[7,8,9,0],[8,9,0,1],[9,0,1,2],[0,2,4,6],[2,4,6,8],[1,3,5,7],[3,5,7,9],[0,2,4,6,8],[1,3,5,7,9]]
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[16,16],kernelSize=[[3,3],[5,5]],channelTable=cTable))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[10,10],kernelSize=[[3,3],[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[12],kernelSize=[[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[12],kernelSize=[[5,5]]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.maxPool],kernelSize=[[2,2]]))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[20],kernelSize=[[3,3]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[6],kernelSize=[[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[6],kernelSize=[[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.avePool],kernelSize=[[2,2]]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.reshape,kernelSize=[[1,1]]))
-    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[50]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[150]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.norm]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
+    ann=ANN(modelName='cnn_single',batchSize=1)
+    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.L2)
+    trainBySameStep(ann,trainDS,testDS,round=20,step=0.01,minRound=1)
+'''
+
+    #Â§öÂ∞∫ÂØ∏Âç∑ÁßØÊ†∏
+'''
+    trainDS,testDS=auxiliary_tools.getDataSet()
+    infoOfLayer:List[layerInfo]=[]
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[trainDS.x.shape[4],trainDS.x.shape[5]]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[5,5],kernelSize=[[3,3],[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[5,5],kernelSize=[[3,3],[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.maxPool],kernelSize=[[2,2]]))
+    cTable=[[0,2,4,6,8],[1,3,5,7,9]]
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[7,3],kernelSize=[[3,3],[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[3,7],kernelSize=[[3,3],[5,5]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.pool,pMethod=[poolMethod.avePool],kernelSize=[[2,2]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.reshape,kernelSize=[[1,1]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[120]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.softMax]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
-    ann=ANN(modelName='cov2#_softMax',batchSize=50)
+    ann=ANN(modelName='cnn_multiple',batchSize=1)
     ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy)
-    trainByAdamStep(ann,trainDS,testDS,round=10,step=0.0001)
+    trainByAdamStep(ann,trainDS,testDS,round=20,step=0.00001,minRound=1)
 
 '''
 
-#æÌª˝≤–≤ÓÕ¯¬Á
+#Âç∑ÁßØÊÆãÂ∑ÆÁΩëÁªú
 #============================================================================================================================================
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
@@ -351,9 +372,9 @@ main()
 
 '''
 
-#—≠ª∑…Òæ≠Õ¯¬Á
+#Âæ™ÁéØÁ•ûÁªèÁΩëÁªú
 #============================================================================================================================================
-    #∏–÷™ª˙∞Ê
+    #ÊÑüÁü•Êú∫Áâà acc:95.18%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     numOfTime=4
@@ -365,14 +386,33 @@ main()
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[70],isRecurrent=True))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.softMax]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
-    ann=ANN(modelName='rnn',batchSize=1,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier)
+    ann=ANN(modelName='rnn_perceptron',batchSize=1,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier)
     ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy)
     trainByAdamStep(ann,trainDS,testDS,round=20,step=0.001,minRound=1)
 '''
+    #ÊÑüÁü•Êú∫_ÊâπÈáèÂΩí‰∏ÄÂåñÁâà acc:97.19 %
+'''
+    trainDS,testDS=auxiliary_tools.getDataSet()
+    numOfTime=4
+    auxiliary_tools.changeToTimeSequence(trainDS,numOfTime)
+    auxiliary_tools.changeToTimeSequence(testDS,numOfTime)
+    infoOfLayer:List[layerInfo]=[]
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[trainDS.x.shape[4],trainDS.x.shape[5]]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.reshape,kernelSize=[[1,1]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[90]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[80],isRecurrent=True))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.batchNormalization))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[70],isRecurrent=True))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.softMax]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
+    ann=ANN(modelName='rnn_perceptron_bn',batchSize=50,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier)
+    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy,isCheckShare=False)
+    trainByAdamStep(ann,trainDS,testDS,round=20,step=0.001,minRound=1)
+'''
 
-#À´œÚ—≠ª∑…Òæ≠Õ¯¬Á
+#ÂèåÂêëÂæ™ÁéØÁ•ûÁªèÁΩëÁªú
 #============================================================================================================================================
-    #∏–÷™ª˙∞Ê
+    #ÊÑüÁü•Êú∫Áâà acc:96.18%
 '''
     trainDS,testDS=auxiliary_tools.getDataSet()
     numOfTime=4
@@ -384,30 +424,27 @@ main()
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[70],isRecurrent=True))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.softMax]))
     infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
-    ann=ANN(modelName='rnn',batchSize=1,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier,isBidirectional=True)
+    ann=ANN(modelName='rnn_Bi_perceptron',batchSize=1,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier,isBidirectional=True)
     ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy)
     trainByAdamStep(ann,trainDS,testDS,round=20,step=0.001,minRound=1)
 '''
 
+    #ÊÑüÁü•Êú∫_ÊâπÈáèÂΩí‰∏ÄÂåñÁâà acc:96.88 %
 '''
-#leNet-5
-torch.set_default_device('cuda')
-trainDS,testDS=aNNetwork.getDataSet()
-layer=[aNNetwork.layer]*7
-layer[0]=aNNetwork.layer(layer=tpLayer.input,outputDim=trainDS.x.shape[1])
-layer[1]=aNNetwork.layer(layer=tpLayer.conv,kernelSize=5,channelSize=6)
-layer[2]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
-channelTable=torch.tensor([[1,0,0,0,1,1,1,0,0,1,1,1,1,0,1,1],\
-                            [1,1,0,0,0,1,1,1,0,0,1,1,1,1,0,1],\
-                            [1,1,1,0,0,0,1,1,1,0,0,1,0,1,1,1],\
-                            [0,1,1,1,0,0,1,1,1,1,0,0,1,0,1,1],\
-                            [0,0,1,1,1,0,0,1,1,1,1,0,1,1,0,1],\
-                            [0,0,0,1,1,1,0,0,1,1,1,1,0,1,1,1]],dtype=torch.long)
-layer[3]=aNNetwork.layer(layer=tpLayer.conv,kernelSize=5,channelSize=16,channelTable=channelTable.T)
-layer[4]=aNNetwork.layer(layer=tpLayer.pool,kernelSize=2,actFunc=actFunc.Non)
-layer[5]=aNNetwork.layer(layer=tpLayer.link,outputDim=120)
-layer[6]=aNNetwork.layer(layer=tpLayer.link,outputDim=10,actFunc=actFunc.norm)
-cnn=aNNetwork.CNN(layer)
-aNNetwork.trainBySameStep(cnn,trainDS,testDS,50,0.1,2000)
+    trainDS,testDS=auxiliary_tools.getDataSet()
+    numOfTime=4
+    auxiliary_tools.changeToTimeSequence(trainDS,numOfTime)
+    auxiliary_tools.changeToTimeSequence(testDS,numOfTime)
+    infoOfLayer:List[layerInfo]=[]
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.input,channelSize=[1],kernelSize=[[trainDS.x.shape[4],trainDS.x.shape[5]]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.reshape,kernelSize=[[1,1]]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[90]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[80],isRecurrent=True))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.batchNormalization))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[70],isRecurrent=True))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.conv,channelSize=[trainDS.y.shape[3]],aFunc=[actFunc.softMax]))
+    infoOfLayer.append(layerInfo(layerType=typeOfLayer.output))
+    ann=ANN(modelName='rnn_Bi_perceptron_bn',batchSize=50,numOfMaxRecurrent=numOfTime,recurrentTimeWeightModel=recurrentTimeWeightModel.classifier,isBidirectional=True)
+    ann.createAnn(lyInfo=infoOfLayer,lsFunc=lossFunc.crossEntropy,isCheckShare=False)
+    trainByAdamStep(ann,trainDS,testDS,round=20,step=0.001,minRound=1)
 '''
-
