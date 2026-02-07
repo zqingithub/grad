@@ -1,8 +1,9 @@
 ﻿#用于实现一些辅助功能，例如数据集导入，准确率计算，训练过程可视化等
 from __future__ import annotations
-from ast import List, Tuple
+from ast import Dict, List, Tuple
 from multiprocessing import Queue
 import time
+from typing import Any
 import numpy
 import torch.utils.data.dataset
 import torchvision
@@ -11,10 +12,30 @@ from matplotlib.animation import FuncAnimation
 import torch
 import random
 import threading
-from artificial_neural_network import ANN
+from artificial_neural_network import ANN, actFunc, layerInfo
 import math
+import json
+from gradMatrix import gradMatrix as GM
+import artificial_neural_network
+import os
+import datetime
 
 class dataSet:
+    """
+    用于训练时储存数据集，x为样本的特征，y为样本的标签。x的shape形状应该为：[n,t,1,c,h,w].其中：
+    n：表示样本个数。
+    t：每个样本的时序个数。对于循环神经网络，每个样本的特征是一个时间序列，对于非循环神经网络，则可认为只有一个时序的特征。
+    1：为了兼容pytorch中卷积操作对图片格式的要求，这里固定设置为1。在pytorch中此处表示图片的个数，但是在实际实现过程中每次只处理一幅图片，因此这里固定为1。
+    c：图片的通道数。
+    h：图片的高。
+    w：图片的宽。
+    假设有100个样本，每个样本的特征是2个时间序列，每个时间序列是一幅3通道的5×7大小的图片，则x的shape为[100,2,1,3,5,7]
+    y的shape形状应该为：[n,t,1,d],其中：
+    n：表示样本个数。
+    t：每个样本的时序个数。样本有几个时序的特征，就应该有相同时序数量的标签。
+    1：固定为1。
+    d：标签的维度。假设是分类问题，标签的维度就是类别的个数。假设是回归问题，标签的维度就是需要回归的目标向量的维度。
+    """
     def __init__(self,x:torch.tensor=None,y:torch.tensor=None):
         self.x:torch.tensor=x
         self.y:torch.tensor=y
@@ -29,14 +50,14 @@ def getDataSet()->Tuple[dataSet]:
     tl:torch.tensor=torch.zeros((nSample,10),dtype=torch.float)
     tl.scatter_(1,trainDS.targets.unsqueeze(1),torch.ones((nSample,1),dtype=torch.float))
     tl=tl.unsqueeze(1).unsqueeze(1)
+    newOrder=list(range(nSample))
     for i in range(nSample):
         pos=random.randint(i,nSample-1)
-        ex=td[pos]
-        td[pos]=td[i]
-        td[i]=ex
-        ex=tl[pos]
-        tl[pos]=tl[i]
-        tl[i]=ex
+        ex=newOrder[pos]
+        newOrder[pos]=newOrder[i]
+        newOrder[i]=ex
+    td=td[newOrder]
+    tl=tl[newOrder]
 
     DS1:dataSet=dataSet(td,tl)
     testDS:torch.utils.data.dataset=torchvision.datasets.MNIST(root="C:/data",train=False,download=False)
@@ -48,14 +69,15 @@ def getDataSet()->Tuple[dataSet]:
     tl=torch.zeros((nSample,10),dtype=torch.float)
     tl.scatter_(1,testDS.targets.unsqueeze(1),torch.ones((nSample,1),dtype=torch.float))
     tl=tl.unsqueeze(1).unsqueeze(1)
+    newOrder=list(range(nSample))
     for i in range(nSample):
         pos=random.randint(i,nSample-1)
-        ex=td[pos]
-        td[pos]=td[i]
-        td[i]=ex
-        ex=tl[pos]
-        tl[pos]=tl[i]
-        tl[i]=ex
+        ex=newOrder[pos]
+        newOrder[pos]=newOrder[i]
+        newOrder[i]=ex
+    td=td[newOrder]
+    tl=tl[newOrder]
+
 
     return (DS1,dataSet(td,tl))
 
@@ -182,11 +204,171 @@ def drawLine(x:List[int],y_test:List[float],y_train:List[float],pos:List[int],mo
     plt.tight_layout()
     plt.show()
 
-def changeToTimeSequence(dataSet:dataSet,numOfTime:int):
-    tempShape=dataSet.x.shape
-    dataSet.x=dataSet.x.reshape([tempShape[0],numOfTime,tempShape[2],tempShape[3],tempShape[4]//numOfTime,tempShape[5]])
-    dataSet.y=torch.repeat_interleave(dataSet.y,numOfTime,1)
+def changeToTimeSequence(dataSet:dataSet,numOfTime:int,width:int=0,step:int=1):
+    if width==0:
+        tempShape=dataSet.x.shape
+        dataSet.x=dataSet.x.reshape([tempShape[0],numOfTime,tempShape[2],tempShape[3],tempShape[4],tempShape[5]//numOfTime])
+        dataSet.y=torch.repeat_interleave(dataSet.y,numOfTime,1)
+    else:
+        tempShape=dataSet.x.shape
+        tempX=torch.zeros([tempShape[0],numOfTime,tempShape[2],tempShape[3],tempShape[4],width],dtype=torch.float)
+        for n in range(tempShape[0]):
+            for t in range(numOfTime):
+                tempX[n,t,0,0,:,:]=dataSet.x[n,0,0,0,:,t*step:t*step+width].clone()
+        dataSet.x=tempX
+        dataSet.y=torch.repeat_interleave(dataSet.y,numOfTime,1)
 
+class _modelStructureJsonEncoder(json.JSONEncoder):
+    def default(self,obj:Any)->Any:
+        if isinstance(obj,artificial_neural_network.actFunc):
+            return {'__enum__':'actFunc','__value__':obj.name}
+        if isinstance(obj,artificial_neural_network.lossFunc):
+            return {'__enum__':'lossFunc','__value__':obj.name}
+        if isinstance(obj,artificial_neural_network.typeOfLayer):
+            return {'__enum__':'typeOfLayer','__value__':obj.name}
+        if isinstance(obj,artificial_neural_network.poolMethod):
+            return {'__enum__':'poolMethod','__value__':obj.name}
+        if isinstance(obj,artificial_neural_network.recurrentLinkMode):
+            return {'__enum__':'recurrentLinkMode','__value__':obj.name}
+        if isinstance(obj,artificial_neural_network.recurrentTimeWeightModel):
+            return {'__enum__':'recurrentTimeWeightModel','__value__':obj.name}
+        if isinstance(obj,artificial_neural_network.timeDirection):
+            return {'__enum__':'timeDirection','__value__':obj.name}
 
+        if isinstance(obj,set):
+            temp=[]
+            for i in obj:
+                temp.append(i)
+            return {'__annSet__':temp}
 
+        if isinstance(obj,artificial_neural_network.layerInfo):
+            tempLyInfo:artificial_neural_network.layerInfo=obj
+            return {"typeOfLayer":tempLyInfo.typeOfLayer,
+                    "kernelSize":tempLyInfo.kernelSize,
+                    "channelSize":tempLyInfo.channelSize,
+                    "actFunc":tempLyInfo.actFunc,
+                    "poolMethod":tempLyInfo.poolMethod,
+                    "channelTable":tempLyInfo.channelTable,
+                    "shortCircuitAddSet":tempLyInfo.shortCircuitAddSet,
+                    "shortCircuitConcateSet":tempLyInfo.shortCircuitConcateSet,
+                    "isRecurrent":tempLyInfo.isRecurrent,
+                    "recurrentLinkMode":tempLyInfo.recurrentLinkMode}
 
+        if isinstance(obj, artificial_neural_network.ANN):
+            tempANN:artificial_neural_network.ANN=obj
+            return {"modelName":tempANN.modelName,
+                    "batchSize":tempANN.batchSize,
+                    "numOfMaxRecurrent":tempANN.numOfMaxRecurrent,
+                    "recurrentTimeWeightModel":tempANN.recurrentTimeWeightModel,
+                    "isBidirectional":tempANN.isBidirectional,
+                    "lossFunc":tempANN.lossFunc,
+                    "layerInfo":tempANN.layerInfo}
+
+        return super().default(obj)
+
+def _enumObjectHook(obj:Any)->Any:
+    strToEnum={'actFunc':lambda tempStr:artificial_neural_network.actFunc[tempStr],
+               'lossFunc':lambda tempStr:artificial_neural_network.lossFunc[tempStr],
+               'typeOfLayer':lambda tempStr:artificial_neural_network.typeOfLayer[tempStr],
+               'poolMethod':lambda tempStr:artificial_neural_network.poolMethod[tempStr],
+               'recurrentLinkMode':lambda tempStr:artificial_neural_network.recurrentLinkMode[tempStr],
+               'recurrentTimeWeightModel':lambda tempStr:artificial_neural_network.recurrentTimeWeightModel[tempStr],
+               'timeDirection':lambda tempStr:artificial_neural_network.timeDirection[tempStr]}
+    if '__enum__' in obj:
+        return strToEnum[obj['__enum__']](obj['__value__'])
+    if '__annSet__' in obj:
+        temp=set()
+        tempList:List=obj['__annSet__']
+        for i in range(len(tempList)):
+            temp.add(tempList[i])
+        return temp
+
+    return obj
+
+def modelStructureSaveToJson(model:ANN,savePath:str=""):
+    path:str=os.sep+model.modelName+'-structure-'+datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")+'.json'
+    if savePath=="":
+        path=os.path.join(os.path.expanduser("~"),path)
+    else:
+        path=os.path.join(savePath,path)
+    with open(path,'wt',encoding='utf-8') as file: 
+        tempJson:str=json.dumps(model,cls=_modelStructureJsonEncoder)
+        json.dump(tempJson,file,indent=4,ensure_ascii=False)
+        print('model structure success save to: '+path)
+
+def modelParameterSaveToFile(model:ANN,savePath:str=""):
+    path:str=os.sep+model.modelName+'-parameter-'+datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")+'.pth'
+    if savePath=="":
+        path=os.path.join(os.path.expanduser("~"),path)
+    else:
+        path=os.path.join(savePath,path)
+
+    para=dict()
+    for i in range(len(model.modelPara)):
+        para[i]=model.modelPara[i].value.clone()
+
+    count:int=len(model.modelPara)-1
+    for i in range(len(model.bnMeanValue)):
+        for k in range(3):
+            count+=1
+            para[count]=model.bnMvEma[k][i].clone()
+            count+=1
+            para[count]=model.bnDeEma[k][i].clone()
+        for j in range(model.numOfMaxRecurrent):
+            for k in range(3):
+                count+=1
+                para[count]=model.bnMvEmaPerTime[j][k][i].clone()
+                count+=1
+                para[count]=model.bnDeEmaPerTime[j][k][i].clone()
+
+    torch.save(para,path)
+    print('model parameter success save to: '+path)
+
+def createModelStructureFromJson(jsonStr:str=None,file:str=None)->artificial_neural_network.ANN:
+    model:artificial_neural_network.ANN=None
+    modelInfo:Dict=None
+    if jsonStr!=None:
+        modelInfo=json.loads(jsonStr,object_hook=_enumObjectHook)
+    else:
+        if file!=None:
+            with open(file,'r',encoding='utf-8') as jsonFile:
+                modelInfo=json.loads(json.load(jsonFile),object_hook=_enumObjectHook)
+    if modelInfo!=None:
+        model=artificial_neural_network.ANN(modelName=modelInfo["modelName"],\
+                                            batchSize=modelInfo["batchSize"],\
+                                            numOfMaxRecurrent=modelInfo["numOfMaxRecurrent"],\
+                                            recurrentTimeWeightModel=modelInfo["recurrentTimeWeightModel"],\
+                                            isBidirectional=modelInfo["isBidirectional"])
+        layInfo:List[artificial_neural_network.layerInfo]=[]
+        for tempInfo in modelInfo["layerInfo"]:
+            temp=artificial_neural_network.layerInfo(layerType=tempInfo['typeOfLayer'],\
+                                                     kernelSize=tempInfo['kernelSize'],\
+                                                     channelSize=tempInfo['channelSize'],\
+                                                     aFunc=tempInfo['actFunc'],\
+                                                     pMethod=tempInfo['poolMethod'],\
+                                                     channelTable=tempInfo['channelTable'],\
+                                                     shortCircuitAddSet=tempInfo['shortCircuitAddSet'],\
+                                                     shortCircuitConcateSet=tempInfo['shortCircuitConcateSet'],\
+                                                     isRecurrent=tempInfo['isRecurrent'],\
+                                                     rcLinkMode=tempInfo['recurrentLinkMode'])
+            layInfo.append(temp)
+        model.createAnn(lyInfo=layInfo,lsFunc=modelInfo['lossFunc'],isCheckShare=False)
+    return model
+
+def loadModelParameterFromFile(model:artificial_neural_network.ANN,file:str):
+    para:Dict=torch.load(file)
+    for i in range(len(model.modelPara)):
+        model.modelPara[i].value=para[i]
+    count:int=len(model.modelPara)-1
+    for i in range(len(model.bnMeanValue)):
+        for k in range(3):
+            count+=1
+            model.bnMvEma[k][i]=para[count]
+            count+=1
+            model.bnDeEma[k][i]=para[count]
+        for j in range(model.numOfMaxRecurrent):
+            for k in range(3):
+                count+=1
+                model.bnMvEmaPerTime[j][k][i]=para[count]
+                count+=1
+                model.bnDeEmaPerTime[j][k][i]=para[count]

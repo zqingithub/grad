@@ -19,6 +19,8 @@ class actFunc(Enum):
     norm=4
     softMax=5
     LReLU=6
+    tanh=7
+    GELU=8
 
 class lossFunc(Enum):
     """
@@ -38,6 +40,7 @@ class typeOfLayer(Enum):
     pool：池化层
     batchNormalization：批量归一化层
     output：输出层
+    LSTM：长短时记忆层
     """
     input=0
     conv=1
@@ -45,6 +48,7 @@ class typeOfLayer(Enum):
     pool=3
     batchNormalization=4
     output=5
+    LSTM=6
 
 class poolMethod(Enum):
     """
@@ -94,7 +98,7 @@ class layerInfo:
     用于接收神经网络中每一层的类型、通道数、宽和高、激活函数等构造信息，在构造神经网络时使用
     """
     def __init__(self,channelSize:List[int]=None,layerType:typeOfLayer=typeOfLayer.conv,kernelSize:List[List[int]]=None,aFunc:List[actFunc]=None,pMethod:List[poolMethod]=None,\
-        channelTable:List[List[int]]=None,shortCircuitAddSet:Set[int]={},shortCircuitConcateSet:Set[int]={},isRecurrent:bool=False,rcLinkMode:recurrentLinkMode=recurrentLinkMode.concatenate):
+        channelTable:List[List[int]]=None,shortCircuitAddSet:Set[int]=set(),shortCircuitConcateSet:Set[int]=set(),isRecurrent:bool=False,rcLinkMode:recurrentLinkMode=recurrentLinkMode.concatenate):
         """
         typeOfLayer:该层的类型
         kernelSize:如果是输入层，则表示图片的高和宽，建议输入层采用pytorch官方中对图像的统一表示，即[p，c，h，w]，p：图片的张数，在实现过程中p为1，通过其他方式实现批量处理，c：通道数，h：图片高，w：图片宽。
@@ -126,6 +130,8 @@ class layerInfo:
         批量归一化层：layerInfo(layerType=typeOfLayer.batchNormalization,aFunc=[actFunc.LReLU]),对上一层进行批量归一化处理，使用LReLU函数作为激活函数。输出的通道数和上一层的通道数相同。如果未设置aFunc，则不使用激活函数，但是
                       仍会设置斜率和偏置（上一层的输出的每个元素对应一组斜率和偏置）模型参数对批量归一化的结果进行调整。
         输出层：layerInfo(layerType=typeOfLayer.output)。每个神经网络都必须设置一个输出层，用于输出最终的模型输出向量。
+        LSTM层：layerInfo(layerType=typeOfLayer.LSTM)。使用经典的LSTM结构，如果为双向LSTM循环神经网络，则记忆存储单元的会接收来自过去和未来的双向信息，拼接双向信息后需要对通道进行降维（记忆存储单元的通道数需要和该层输入的通
+                道数相同），降维方法为线性映射直接降维，不使用激活函数，线性映射的斜率和偏置作为模型参数学习。
         """
         self.typeOfLayer:typeOfLayer=layerType
         self.kernelSize:List[List[int]]=kernelSize
@@ -178,6 +184,18 @@ def norm(input:GM)->GM:
     input=input/tempSum.repeat(input.value.shape)
     return input.reshape(tempShape)
 
+def tanh(input:GM)->GM:
+    temp=torch.ones(input.value.shape,dtype=torch.float)
+    return input.sigmoid()*GM(temp*2)-GM(temp)
+
+def GELU(input:GM)->GM:
+    temp=torch.ones(input.value.shape,dtype=torch.float)
+    temp2=input.pow(3)
+    temp2=temp2*GM(temp*0.044715)
+    temp2=input+temp2
+    temp2=temp2*GM(temp*math.sqrt(2/math.pi))
+    temp2=tanh(temp2)+GM(temp)
+    return input*temp2*GM(temp*0.5)
 
 def softMax(input:GM)->GM:
     return input.softmax()
@@ -209,6 +227,10 @@ def doActivation(input:GM,actFun:actFunc)->GM:
         input=LReLU(input)
     if actFun==actFunc.softMax:
         input=softMax(input)
+    if actFun==actFunc.tanh:
+        input=tanh(input)
+    if actFun==actFunc.GELU:
+        input=GELU(input)
     return input
 
 def doPoolMethod(input:GM,poolM:poolMethod,kernelSize:int)->GM:
@@ -283,10 +305,9 @@ class ANN:
         RealYRecord：用于记录各个时序上的样本真实标签输入。
         recurrentLeftInput：用于在循环神经网络中接收来自过去时序的信息，同时在计算模型参数梯度时用于向过去时序传递当前及未来时序的梯度。
         recurrentRightInput：用于在循环神经网络中接收来自未来时序的信息，同时在计算模型参数梯度时用于向未来时序传递当前及过去时序的梯度。
+        recurrentOutput:循环神经网络中当前时序的循环层的输出（有不同时序的输出作为输入的层）。
         recurrentInputPreGrad：用于在循环神经网络中计算模型参数梯度时，保存其他时序产生的梯度，计算当前时序的模型参数梯度时会用到。
         recurrentInput：用于在构建循环神经网络时，临时存储recurrentLeftInput和recurrentRightInput中的示例，将循环神经网络的过去和未来时序的输入接入同跨层短接的输入接入统一起来。
-        recurrentOutputLayerNo：用于存储第i个有不同时序的输出作为输入的层（以下简称循环层）在神经网络所有输出层中对应的编号。例如列表中的第1个元素（假设数值为4），表示第一个循环层在整个神经网络
-                                所有层中的编号（从0开始编号），则第一个循环层在整个神经网络中位于第5层。
         rcLeftInputStore：用于储存循环神经网络中，信息从过去向未来传递时，每个时序的循环层产生的输出。
         rcRightInputStore：用于储存循环神经网络中，信息从未来向过去传递时，每个时序的循环层产生的输出。
         rcLeftInputGradStore：用于在计算模型参数梯度的过程中，暂存recurrentLeftInput的梯度，减少一次梯度计算的次数。
@@ -334,9 +355,9 @@ class ANN:
             self.RealYRecord[i]=[None]*batchSize
         self.recurrentLeftInput:List[List[GM]]=[None]*batchSize
         self.recurrentRightInput:List[List[GM]]=[None]*batchSize
+        self.recurrentOutput:List[List[GM]]=[None]*batchSize
         self.recurrentInputPreGrad:List[List[torch.tensor]]=[None]*batchSize
         self.recurrentInput:List[List[GM]]=[None]*batchSize
-        self.recurrentOutputLayerNo:List[int]=None
         self.rcLeftInputStore:List[List[List[torch.tensor]]]=[None]*(numOfMaxRecurrent+1)
         self.rcRightInputStore:List[List[List[torch.tensor]]]=[None]*(numOfMaxRecurrent+1)
         self.rcLeftInputGradStore:List[List[List[torch.tensor]]]=[None]*(numOfMaxRecurrent+1)
@@ -384,6 +405,17 @@ class ANN:
                 if layInfo.actFunc[i]!=actFunc.Non:
                     self.modelPara.append(GM(torch.rand([1,inSum[i],1,1],dtype=torch.float)/2,gradMatrix.variableType.gradVariable))
                     self.modelPara.append(GM(torch.rand([1,inSum[i],1,1],dtype=torch.float)/2,gradMatrix.variableType.gradVariable))
+            return
+
+        if layInfo.typeOfLayer==typeOfLayer.LSTM:
+            numOfIn=2
+            if self.isBidirectional:
+                numOfIn=3
+            tempShape=[input.shape[1],input.shape[1]*numOfIn+1,1,1]
+            self.modelPara.append(GM(torch.zeros(tempShape,dtype=torch.float)/tempShape[1],gradMatrix.variableType.gradVariable))
+            self.modelPara.append(GM(torch.rand(tempShape,dtype=torch.float)*0.1/tempShape[1],gradMatrix.variableType.gradVariable))
+            self.modelPara.append(GM(torch.zeros(tempShape,dtype=torch.float)/tempShape[1],gradMatrix.variableType.gradVariable))
+            self.modelPara.append(GM(torch.zeros(tempShape,dtype=torch.float)/tempShape[1],gradMatrix.variableType.gradVariable))
             return
               
 
@@ -566,7 +598,7 @@ class ANN:
                 for i in range(self.batchSize):
                     temp=(self.layerInput[i]-self.tempBnMV)*(self.layerInput[i]-self.tempBnMV)
                     self.tempBnSD=self.tempBnSD+temp
-                self.tempBnSD=self.tempBnSD/GM(torch.ones(self.tempBnMV.value.shape,dtype=torch.float)*self.batchSize)
+                self.tempBnSD=self.tempBnSD/GM(torch.ones(self.tempBnMV.value.shape,dtype=torch.float)*(self.batchSize-1))
                 self.bnDeviation.append(self.tempBnSD)
                 self.tempBnSD=(self.tempBnSD+GM(torch.ones(self.tempBnMV.value.shape,dtype=torch.float)*1e-15)).pow(0.5)+GM(torch.ones(self.tempBnMV.value.shape,dtype=torch.float)*1e-15)
                 self.__createModelPara(layerNo)
@@ -574,8 +606,38 @@ class ANN:
             temp=(self.layerInput[batchNo]-self.tempBnMV)/self.tempBnSD
             temp=temp*self.modelPara[-2]+self.modelPara[-1]
             self.layerOutput[batchNo][layerNo]=doActivation(temp,self.layerInfo[layerNo].actFunc[0])
-        
+   
 
+    def __createLSTMLayer(self,layerNo:int,batchNo:int):
+        if batchNo==0:
+            self.__createModelPara(layerNo)
+        input:GM=self.layerInput[batchNo]
+        self.recurrentLeftInput[batchNo].append(GM(torch.rand(input.value.shape,dtype=torch.float),gradMatrix.variableType.gradVariable))
+        self.recurrentRightInput[batchNo].append(GM(torch.rand(input.value.shape,dtype=torch.float),gradMatrix.variableType.gradVariable))
+        input=GM(torch.ones((1,1,self.layerInput[batchNo].value.shape[2],self.layerInput[batchNo].value.shape[3]),dtype=torch.float))
+        input=GM.cat(self.layerInput[batchNo],input,1)
+        input=GM.cat(self.recurrentLeftInput[batchNo][-1],input,1)
+        if self.isBidirectional:
+            input=GM.cat(input,self.recurrentRightInput[batchNo][-1],1)
+        forget:GM=doActivation(input.conv2D(self.modelPara[-1]),actFun=actFunc.sigmoid)
+        remember:GM=doActivation(input.conv2D(self.modelPara[-2]),actFun=actFunc.sigmoid)*doActivation(input.conv2D(self.modelPara[-3]),actFun=actFunc.tanh)
+        output1:GM=doActivation(input.conv2D(self.modelPara[-4]),actFun=actFunc.sigmoid)
+        tempShape=self.layerInput[batchNo].value.shape
+        self.recurrentLeftInput[batchNo].append(GM(torch.rand(tempShape,dtype=torch.float),gradMatrix.variableType.gradVariable))
+        self.recurrentRightInput[batchNo].append(GM(torch.rand(tempShape,dtype=torch.float),gradMatrix.variableType.gradVariable))
+        memory=self.recurrentLeftInput[batchNo][-1]
+        if self.isBidirectional:
+            memory=memory+self.recurrentRightInput[batchNo][-1]
+        tempOutput=memory*forget+remember
+        self.layerOutput[batchNo][layerNo]=doActivation(tempOutput,actFun=actFunc.tanh)*output1
+        self.recurrentOutput[batchNo].append(self.layerOutput[batchNo][layerNo])
+        self.recurrentOutput[batchNo].append(tempOutput)
+
+
+    def __updateRecurrentOutput(self,layerNo:int,batchNo:int):
+        layInfo:layerInfo=self.layerInfo[layerNo]
+        if layInfo.isRecurrent:
+            self.recurrentOutput[batchNo].append(self.layerOutput[batchNo][layerNo])
 
     def __createLayer(self,layerNo:int,batchNo:int):
         if self.layerInfo[layerNo].typeOfLayer==typeOfLayer.input:
@@ -595,6 +657,9 @@ class ANN:
             return
         if self.layerInfo[layerNo].typeOfLayer==typeOfLayer.output:
             self.__createOutputLayer(layerNo,batchNo)
+            return
+        if self.layerInfo[layerNo].typeOfLayer==typeOfLayer.LSTM:
+            self.__createLSTMLayer(layerNo,batchNo)
             return
 
     def __createRecurrent(self,layerNo:int,batchNo:int):
@@ -640,6 +705,7 @@ class ANN:
             self.layerOutput[i]=[None]*len(lyInfo)
             self.recurrentLeftInput[i]=[]
             self.recurrentRightInput[i]=[]
+            self.recurrentOutput[i]=[]
             self.recurrentInput[i]=[]
             self.recurrentInputPreGrad[i]=[]
         self.layerInput=[None]*self.batchSize
@@ -661,6 +727,8 @@ class ANN:
                 self.__linkShortCircuit(i-1,j)
             for j in range(self.batchSize):
                 self.__createLayer(i,j)
+            for j in range(self.batchSize):
+                self.__updateRecurrentOutput(i,j)
             for j in range(self.batchSize):
                 self.__registerShortCircuit(i,j)
 
@@ -686,11 +754,6 @@ class ANN:
                 self.rcRightInputStore[i][j]=[None]*rcInputLen
                 self.rcLeftInputGradStore[i][j]=[None]*rcInputLen
                 self.rcRightInputGradStore[i][j]=[None]*rcInputLen
-
-        self.recurrentOutputLayerNo=[]
-        for i in range(len(self.layerInfo)):
-            if self.layerInfo[i].isRecurrent:
-                self.recurrentOutputLayerNo.append(i)
 
         for i in range(self.batchSize):
             for j in range(len(self.recurrentLeftInput[0])):
@@ -823,11 +886,11 @@ class ANN:
         if isLeftInput:
             for i in range(self.batchSize):
                 for j in range(len(self.recurrentLeftInput[0])):
-                    self.rcLeftInputStore[timeNo][i][j]=self.layerOutput[i][self.recurrentOutputLayerNo[j]].value.clone()
+                    self.rcLeftInputStore[timeNo][i][j]=self.recurrentOutput[i][j].value.clone()
         else:
             for i in range(self.batchSize):
                 for j in range(len(self.recurrentRightInput[0])):
-                    self.rcRightInputStore[timeNo][i][j]=self.layerOutput[i][self.recurrentOutputLayerNo[j]].value.clone()
+                    self.rcRightInputStore[timeNo][i][j]=self.recurrentOutput[i][j].value.clone()
 
     def __zeroBorderRecurrentInput(self):
         for i in range(self.batchSize):
@@ -932,7 +995,7 @@ class ANN:
     def __loadRecurrentInputPreGrad(self):
         for i in range(self.batchSize):
             for j in range(len(self.recurrentLeftInput[0])):
-                self.layerOutput[i][self.recurrentOutputLayerNo[j]].sumOfGrad=self.recurrentInputPreGrad[i][j].clone()
+                self.recurrentOutput[i][j].sumOfGrad=self.recurrentInputPreGrad[i][j].clone()
 
     def __saveToRecurrentInputGradStore(self,timeNo:int):
         for i in range(self.batchSize):
